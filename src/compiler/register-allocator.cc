@@ -1514,7 +1514,7 @@ InstructionOperand* ConstraintBuilder::AllocateFixed(
     allocated = AllocatedOperand(AllocatedOperand::REGISTER, machine_type,
                                  operand->fixed_register_index());
   } else if (operand->HasFixedDoubleRegisterPolicy()) {
-    DCHECK(IsFloatingPoint(machine_type));
+    //DCHECK(IsFloatingPoint(machine_type));
     DCHECK_NE(InstructionOperand::kInvalidVirtualRegister, virtual_register);
     allocated = AllocatedOperand(AllocatedOperand::REGISTER, machine_type,
                                  operand->fixed_register_index());

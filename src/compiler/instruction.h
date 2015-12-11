@@ -413,7 +413,7 @@ class LocationOperand : public InstructionOperand {
   }
 
   DoubleRegister GetDoubleRegister() const {
-    DCHECK(IsDoubleRegister());
+    //DCHECK(IsDoubleRegister());
     return DoubleRegister::from_code(static_cast<int64_t>(value_) >>
                                      IndexField::kShift);
   }

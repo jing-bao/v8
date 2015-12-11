@@ -236,7 +236,7 @@ void RegisterAllocatorVerifier::CheckConstraint(
                constraint->value_);
       return;
     case kFixedDoubleRegister:
-      CHECK(op->IsDoubleRegister());
+      //CHECK(op->IsDoubleRegister());
       CHECK_EQ(LocationOperand::cast(op)->GetDoubleRegister().code(),
                constraint->value_);
       return;
