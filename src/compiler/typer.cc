@@ -2141,6 +2141,11 @@ Type* Typer::Visitor::TypeTruncateFloat64ToUint64(Node* node) {
 }
 
 
+Type* Typer::Visitor::TypeChangeInt32ToFloat32(Node* node) {
+  return Type::Intersect(Type::Signed32(), Type::UntaggedFloat32(), zone());
+}
+
+
 Type* Typer::Visitor::TypeChangeInt32ToFloat64(Node* node) {
   return Type::Intersect(Type::Signed32(), Type::UntaggedFloat64(), zone());
 }
@@ -2148,6 +2153,11 @@ Type* Typer::Visitor::TypeChangeInt32ToFloat64(Node* node) {
 
 Type* Typer::Visitor::TypeChangeInt32ToInt64(Node* node) {
   return Type::Internal();
+}
+
+
+Type* Typer::Visitor::TypeChangeUint32ToFloat32(Node* node) {
+  return Type::Intersect(Type::Unsigned32(), Type::UntaggedFloat32(), zone());
 }
 
 

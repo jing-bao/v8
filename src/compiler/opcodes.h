@@ -270,8 +270,10 @@
   V(TruncateFloat64ToInt64)     \
   V(TruncateFloat32ToUint64)    \
   V(TruncateFloat64ToUint64)    \
+  V(ChangeInt32ToFloat32)       \
   V(ChangeInt32ToFloat64)       \
   V(ChangeInt32ToInt64)         \
+  V(ChangeUint32ToFloat32)      \
   V(ChangeUint32ToFloat64)      \
   V(ChangeUint32ToUint64)       \
   V(TruncateFloat64ToFloat32)   \

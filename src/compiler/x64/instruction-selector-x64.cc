@@ -822,6 +822,18 @@ void InstructionSelector::VisitChangeUint32ToFloat64(Node* node) {
 }
 
 
+void InstructionSelector::VisitChangeInt32ToFloat32(Node* node) {
+  X64OperandGenerator g(this);
+  Emit(kSSEInt32ToFloat32, g.DefineAsRegister(node), g.Use(node->InputAt(0)));
+}
+
+
+void InstructionSelector::VisitChangeUint32ToFloat32(Node* node) {
+  X64OperandGenerator g(this);
+  Emit(kSSEUint32ToFloat32, g.DefineAsRegister(node), g.Use(node->InputAt(0)));
+}
+
+
 void InstructionSelector::VisitChangeFloat64ToInt32(Node* node) {
   X64OperandGenerator g(this);
   Emit(kSSEFloat64ToInt32, g.DefineAsRegister(node), g.Use(node->InputAt(0)));
