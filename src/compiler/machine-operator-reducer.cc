@@ -593,14 +593,10 @@ Reduction MachineOperatorReducer::ReduceInt32Mod(Node* node) {
     int32_t const divisor = Abs(m.right().Value());
     if (base::bits::IsPowerOfTwo32(divisor)) {
       uint32_t const mask = divisor - 1;
-      Node* const zero = Int32Constant(0);
-      node->ReplaceInput(
-          0, graph()->NewNode(machine()->Int32LessThan(), dividend, zero));
-      node->ReplaceInput(
-          1, Int32Sub(zero, Word32And(Int32Sub(zero, dividend), mask)));
-      node->ReplaceInput(2, Word32And(dividend, mask));
-      NodeProperties::ChangeOp(
-          node, common()->Select(kMachInt32, BranchHint::kFalse));
+      DCHECK_EQ(dividend, node->InputAt(0));
+      node->ReplaceInput(1, Uint32Constant(mask));
+      node->TrimInputCount(2);
+      NodeProperties::ChangeOp(node, machine()->Word32And());
     } else {
       Node* quotient = Int32Div(dividend, divisor);
       DCHECK_EQ(dividend, node->InputAt(0));
