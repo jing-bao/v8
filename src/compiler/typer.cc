@@ -2110,6 +2110,17 @@ Type* Typer::Visitor::TypeChangeFloat32ToFloat64(Node* node) {
 }
 
 
+Type* Typer::Visitor::TypeChangeFloat32ToInt32(Node* node) {
+  return Type::Intersect(Type::Signed32(), Type::UntaggedIntegral32(), zone());
+}
+
+
+Type* Typer::Visitor::TypeChangeFloat32ToUint32(Node* node) {
+  return Type::Intersect(Type::Unsigned32(), Type::UntaggedIntegral32(),
+                         zone());
+}
+
+
 Type* Typer::Visitor::TypeChangeFloat64ToInt32(Node* node) {
   return Type::Intersect(Type::Signed32(), Type::UntaggedIntegral32(), zone());
 }

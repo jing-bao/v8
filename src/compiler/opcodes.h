@@ -264,6 +264,8 @@
   V(Uint64Div)                  \
   V(Uint64Mod)                  \
   V(ChangeFloat32ToFloat64)     \
+  V(ChangeFloat32ToInt32)       \
+  V(ChangeFloat32ToUint32)      \
   V(ChangeFloat64ToInt32)       \
   V(ChangeFloat64ToUint32)      \
   V(TruncateFloat32ToInt64)     \

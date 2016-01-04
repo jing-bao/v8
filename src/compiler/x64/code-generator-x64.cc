@@ -1027,6 +1027,22 @@ void CodeGenerator::AssembleArchInstruction(Instruction* instr) {
     case kSSEFloat64ToFloat32:
       ASSEMBLE_SSE_UNOP(Cvtsd2ss);
       break;
+    case kSSEFloat32ToInt32:
+      if (instr->InputAt(0)->IsDoubleRegister()) {
+        __ Cvttss2si(i.OutputRegister(), i.InputDoubleRegister(0));
+      } else {
+        __ Cvttss2si(i.OutputRegister(), i.InputOperand(0));
+      }
+      break;
+    case kSSEFloat32ToUint32: {
+      if (instr->InputAt(0)->IsDoubleRegister()) {
+        __ Cvttss2siq(i.OutputRegister(), i.InputDoubleRegister(0));
+      } else {
+        __ Cvttss2siq(i.OutputRegister(), i.InputOperand(0));
+      }
+      __ AssertZeroExtended(i.OutputRegister());
+      break;
+    }
     case kSSEFloat64ToInt32:
       if (instr->InputAt(0)->IsDoubleRegister()) {
         __ Cvttsd2si(i.OutputRegister(), i.InputDoubleRegister(0));

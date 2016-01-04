@@ -205,6 +205,8 @@ class MachineOperatorBuilder final : public ZoneObject {
   // Use narrowing change operators only when there is a static guarantee that
   // the input value is representable in the target value.
   const Operator* ChangeFloat32ToFloat64();
+  const Operator* ChangeFloat32ToInt32();   // narrowing
+  const Operator* ChangeFloat32ToUint32();  // narrowing
   const Operator* ChangeFloat64ToInt32();   // narrowing
   const Operator* ChangeFloat64ToUint32();  // narrowing
   const Operator* TruncateFloat32ToInt64();
