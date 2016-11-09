@@ -118,6 +118,7 @@ class GraphView extends View {
         return {x: d.x, y: d.y};
       })
       .on("drag", function(args){
+        if (d3.event.dx == 0 && d3.event.dy == 0) return;
         graph.state.justDragged = true;
         graph.dragmove.call(graph, args);
       })
