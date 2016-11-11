@@ -456,6 +456,39 @@ Reduction JSNativeContextSpecialization::ReduceElementAccess(
   } else {
     // Retrieve the native context from the given {node}.
     // Compute element access infos for the receiver maps.
+    // JING-------------------------------------------------------------
+    if (receiver_maps.length() == 2 && access_mode == AccessMode::kLoad) {
+      ElementsKind kind0 = receiver_maps.at(0)->elements_kind();
+      ElementsKind kind1 = receiver_maps.at(1)->elements_kind();
+      if ((kind0 == FAST_HOLEY_SMI_ELEMENTS && kind1 == FAST_SMI_ELEMENTS) ||
+          (kind1 == FAST_HOLEY_SMI_ELEMENTS && kind0 == FAST_SMI_ELEMENTS)) {
+        Handle<Map> general_map = kind0 == FAST_HOLEY_SMI_ELEMENTS
+                                      ? receiver_maps.at(0)
+                                      : receiver_maps.at(1);
+        AccessInfoFactory access_info_factory1(dependencies(), native_context(),
+                                               graph()->zone());
+        ElementAccessInfo access_info;
+        if (access_info_factory1.ComputeElementAccessInfo(
+                general_map, access_mode, &access_info)) {
+          receiver = effect = graph()->NewNode(simplified()->CheckHeapObject(),
+                                               receiver, effect, control);
+          effect = graph()->NewNode(common()->Checkpoint(), frame_state, effect,
+                                    control);
+          effect =
+              BuildCheckMaps(receiver, effect, control,
+                             MapList{receiver_maps.at(0), receiver_maps.at(1)});
+          ValueEffectControl continuation =
+              BuildElementAccess(receiver, index, value, effect, control,
+                                 access_info, access_mode, store_mode);
+          value = continuation.value();
+          effect = continuation.effect();
+          control = continuation.control();
+          ReplaceWithValue(node, value, effect, control);
+          return Replace(value);
+        }
+      }
+    }
+    //-------------------------------------------------------------
     AccessInfoFactory access_info_factory(dependencies(), native_context(),
                                           graph()->zone());
     ZoneVector<ElementAccessInfo> access_infos(zone());
