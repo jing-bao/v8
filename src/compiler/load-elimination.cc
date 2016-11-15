@@ -320,6 +320,37 @@ void LoadElimination::AbstractField::Print() const {
   }
 }
 
+NodeSet* LoadElimination::AbstractMapCheck::Lookup(Node* object) const {
+  for (auto pair : maps_for_node_) {
+    if (MustAlias(object, pair.first)) return pair.second;
+  }
+  return nullptr;
+}
+
+LoadElimination::AbstractMapCheck const*
+LoadElimination::AbstractMapCheck::Kill(Node* object, Zone* zone) const {
+  for (auto pair : this->maps_for_node_) {
+    if (MayAlias(object, pair.first)) {
+      AbstractMapCheck* that = new (zone) AbstractMapCheck(zone);
+      for (auto pair : this->maps_for_node_) {
+        if (!MayAlias(object, pair.first)) that->maps_for_node_.insert(pair);
+      }
+      return that;
+    }
+  }
+  return this;
+}
+
+void LoadElimination::AbstractMapCheck::Print() const {
+  for (auto pair : maps_for_node_) {
+    PrintF("    #%d:%s ->", pair.first->id(), pair.first->op()->mnemonic());
+    for (auto node : *(pair.second)) {
+      PrintF("  #%d:%s", node->id(), node->op()->mnemonic());
+    }
+    PrintF("\n");
+  }
+}
+
 bool LoadElimination::AbstractState::Equals(AbstractState const* that) const {
   if (this->checks_) {
     if (!that->checks_ || !that->checks_->Equals(this->checks_)) {
@@ -333,6 +364,13 @@ bool LoadElimination::AbstractState::Equals(AbstractState const* that) const {
       return false;
     }
   } else if (that->elements_) {
+    return false;
+  }
+  if (this->map_checks_) {
+    if (!that->map_checks_ || !that->map_checks_->Equals(this->map_checks_)) {
+      return false;
+    }
+  } else if (that->map_checks_) {
     return false;
   }
   for (size_t i = 0u; i < arraysize(fields_); ++i) {
@@ -360,6 +398,13 @@ void LoadElimination::AbstractState::Merge(AbstractState const* that,
     this->elements_ = that->elements_
                           ? that->elements_->Merge(this->elements_, zone)
                           : nullptr;
+  }
+
+  // Merge the information we have about the map checks.
+  if (this->map_checks_) {
+    this->map_checks_ = that->map_checks_
+                            ? map_checks_->Merge(this->map_checks_, zone)
+                            : nullptr;
   }
 
   // Merge the information we have about the fields.
@@ -476,6 +521,36 @@ Node* LoadElimination::AbstractState::LookupField(Node* object,
   return nullptr;
 }
 
+LoadElimination::AbstractState const*
+LoadElimination::AbstractState::AddMapCheck(Node* object, NodeSet* maps,
+                                            Zone* zone) const {
+  AbstractState* that = new (zone) AbstractState(*this);
+  if (that->map_checks_) {
+    that->map_checks_ = that->map_checks_->Extend(object, maps, zone);
+  } else {
+    that->map_checks_ = new (zone) AbstractMapCheck(object, maps, zone);
+  }
+  return that;
+}
+
+LoadElimination::AbstractState const*
+LoadElimination::AbstractState::KillMapCheck(Node* object, Zone* zone) const {
+  if (this->map_checks_) {
+    AbstractMapCheck const* that_map_checks =
+        this->map_checks_->Kill(object, zone);
+    if (this->map_checks_ != that_map_checks) {
+      AbstractState* that = new (zone) AbstractState(*this);
+      that->map_checks_ = that_map_checks;
+      return that;
+    }
+  }
+  return this;
+}
+
+NodeSet* LoadElimination::AbstractState::LookupMapCheck(Node* object) const {
+  return this->map_checks_ ? this->map_checks_->Lookup(object) : nullptr;
+}
+
 void LoadElimination::AbstractState::Print() const {
   if (checks_) {
     PrintF("   checks:\n");
@@ -484,6 +559,10 @@ void LoadElimination::AbstractState::Print() const {
   if (elements_) {
     PrintF("   elements:\n");
     elements_->Print();
+  }
+  if (map_checks_) {
+    PrintF("   map checks:\n");
+    map_checks_->Print();
   }
   for (size_t i = 0; i < arraysize(fields_); ++i) {
     if (AbstractField const* const field = fields_[i]) {
@@ -525,17 +604,26 @@ Reduction LoadElimination::ReduceCheckMaps(Node* node) {
   AbstractState const* state = node_states_.Get(effect);
   if (state == nullptr) return NoChange();
   int const map_input_count = node->op()->ValueInputCount() - 1;
+  NodeSet* maps = new (zone()->New(sizeof(NodeSet))) NodeSet(zone());
+  if (map_input_count > 1) {
+    for (int i = 0; i < map_input_count; ++i)
+      maps->insert(NodeProperties::GetValueInput(node, 1 + i));
+  }
   if (Node* const object_map =
           state->LookupField(object, FieldIndexOf(HeapObject::kMapOffset))) {
     for (int i = 0; i < map_input_count; ++i) {
       Node* map = NodeProperties::GetValueInput(node, 1 + i);
       if (map == object_map) return Replace(effect);
     }
+  } else if (NodeSet* checked_maps = state->LookupMapCheck(object)) {
+    if (*checked_maps == *maps) return Replace(effect);
   }
   if (map_input_count == 1) {
     Node* const map0 = NodeProperties::GetValueInput(node, 1);
     state = state->AddField(object, FieldIndexOf(HeapObject::kMapOffset), map0,
                             zone());
+  } else {
+    state = state->AddMapCheck(object, maps, zone());
   }
   return UpdateState(node, state);
 }
@@ -614,6 +702,7 @@ Reduction LoadElimination::ReduceTransitionElementsKind(Node* node) {
     }
     state =
         state->KillField(object, FieldIndexOf(HeapObject::kMapOffset), zone());
+    state = state->KillMapCheck(object, zone());
     if (source_map == object_map) {
       state = state->AddField(object, FieldIndexOf(HeapObject::kMapOffset),
                               target_map, zone());
@@ -621,6 +710,7 @@ Reduction LoadElimination::ReduceTransitionElementsKind(Node* node) {
   } else {
     state =
         state->KillField(object, FieldIndexOf(HeapObject::kMapOffset), zone());
+    state = state->KillMapCheck(object, zone());
   }
   ElementsTransition transition = ElementsTransitionOf(node->op());
   switch (transition) {
@@ -678,11 +768,14 @@ Reduction LoadElimination::ReduceStoreField(Node* node) {
       return Replace(effect);
     }
     // Kill all potentially aliasing fields and record the new value.
+    if (field_index == FieldIndexOf(HeapObject::kMapOffset))
+      state = state->KillMapCheck(object, zone());
     state = state->KillField(object, field_index, zone());
     state = state->AddField(object, field_index, new_value, zone());
   } else {
     // Unsupported StoreField operator.
     state = state->KillFields(object, zone());
+    state = state->KillMapCheck(object, zone());
   }
   return UpdateState(node, state);
 }
@@ -870,6 +963,7 @@ LoadElimination::AbstractState const* LoadElimination::ComputeLoopState(
                 object, FieldIndexOf(HeapObject::kMapOffset), zone());
             state = state->KillField(
                 object, FieldIndexOf(JSObject::kElementsOffset), zone());
+            state = state->KillMapCheck(object, zone());
             break;
           }
           case IrOpcode::kStoreField: {
@@ -878,8 +972,11 @@ LoadElimination::AbstractState const* LoadElimination::ComputeLoopState(
             int field_index = FieldIndexOf(access);
             if (field_index < 0) {
               state = state->KillFields(object, zone());
+              state = state->KillMapCheck(object, zone());
             } else {
               state = state->KillField(object, field_index, zone());
+              if (field_index == FieldIndexOf(HeapObject::kMapOffset))
+                state = state->KillMapCheck(object, zone());
             }
             break;
           }

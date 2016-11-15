@@ -150,6 +150,63 @@ class V8_EXPORT_PRIVATE LoadElimination final
     ZoneMap<Node*, Node*> info_for_node_;
   };
 
+  // Abstract state to approximate the current state of map check along
+  // the effect paths through the graph.
+  class AbstractMapCheck final : public ZoneObject {
+   public:
+    explicit AbstractMapCheck(Zone* zone) : maps_for_node_(zone) {}
+    AbstractMapCheck(Node* object, NodeSet* maps, Zone* zone)
+        : maps_for_node_(zone) {
+      maps_for_node_.insert(std::make_pair(object, maps));
+    }
+
+    AbstractMapCheck const* Extend(Node* object, NodeSet* maps,
+                                   Zone* zone) const {
+      AbstractMapCheck* that = new (zone) AbstractMapCheck(zone);
+      that->maps_for_node_ = this->maps_for_node_;
+      that->maps_for_node_.insert(std::make_pair(object, maps));
+      return that;
+    }
+    NodeSet* Lookup(Node* object) const;
+    AbstractMapCheck const* Kill(Node* object, Zone* zone) const;
+    bool Equals(AbstractMapCheck const* that) const {
+      if (this == that || this->maps_for_node_ == that->maps_for_node_)
+        return true;
+      if (this->maps_for_node_.size() != that->maps_for_node_.size())
+        return false;
+      for (auto this_it : this->maps_for_node_) {
+        Node* this_object = this_it.first;
+        NodeSet* this_maps = this_it.second;
+        auto that_it = that->maps_for_node_.find(this_object);
+        if (that_it == that->maps_for_node_.end() ||
+            *(that_it->second) != *this_maps)
+          return false;
+      }
+      return true;
+    }
+    AbstractMapCheck const* Merge(AbstractMapCheck const* that,
+                                  Zone* zone) const {
+      if (this->Equals(that)) return this;
+      AbstractMapCheck* copy = new (zone) AbstractMapCheck(zone);
+      // TODO: Use intersection.
+      for (auto this_it : this->maps_for_node_) {
+        Node* this_object = this_it.first;
+        NodeSet* this_maps = this_it.second;
+        auto that_it = that->maps_for_node_.find(this_object);
+        if (that_it != that->maps_for_node_.end() &&
+            *(that_it->second) == *this_maps) {
+          copy->maps_for_node_.insert(this_it);
+        }
+      }
+      return copy;
+    }
+
+    void Print() const;
+
+   private:
+    ZoneMap<Node*, NodeSet*> maps_for_node_;
+  };
+
   static size_t const kMaxTrackedFields = 32;
 
   class AbstractState final : public ZoneObject {
@@ -179,12 +236,18 @@ class V8_EXPORT_PRIVATE LoadElimination final
     AbstractState const* AddCheck(Node* node, Zone* zone) const;
     Node* LookupCheck(Node* node) const;
 
+    AbstractState const* AddMapCheck(Node* object, NodeSet* maps,
+                                     Zone* zone) const;
+    AbstractState const* KillMapCheck(Node* object, Zone* zone) const;
+    NodeSet* LookupMapCheck(Node* object) const;
+
     void Print() const;
 
    private:
     AbstractChecks const* checks_ = nullptr;
     AbstractElements const* elements_ = nullptr;
     AbstractField const* fields_[kMaxTrackedFields];
+    AbstractMapCheck const* map_checks_ = nullptr;
   };
 
   class AbstractStateForEffectNodes final : public ZoneObject {
