@@ -1056,33 +1056,35 @@ class V8_EXPORT_PRIVATE CodeStubAssembler : public compiler::CodeAssembler {
   // field |BitField| in |word32|. Returns result as an uint32 node.
   template <typename BitField>
   TNode<Uint32T> DecodeWord32(SloppyTNode<Word32T> word32) {
-    return DecodeWord32(word32, BitField::kShift, BitField::kMask);
+    return DecodeWord32(word32, BitField::kShift, BitField::kMask,
+                        BitField::kSize);
   }
 
   // Returns a node that contains a decoded (unsigned!) value of a bit
   // field |BitField| in |word|. Returns result as a word-size node.
   template <typename BitField>
   Node* DecodeWord(Node* word) {
-    return DecodeWord(word, BitField::kShift, BitField::kMask);
+    return ChangeUint32ToWord(
+        DecodeWord32<BitField>(TruncateWordToWord32(word)));
   }
 
   // Returns a node that contains a decoded (unsigned!) value of a bit
   // field |BitField| in |word32|. Returns result as a word-size node.
   template <typename BitField>
   Node* DecodeWordFromWord32(Node* word32) {
-    return DecodeWord<BitField>(ChangeUint32ToWord(word32));
+    return ChangeUint32ToWord(DecodeWord32<BitField>(word32));
   }
 
   // Returns a node that contains a decoded (unsigned!) value of a bit
   // field |BitField| in |word|. Returns result as an uint32 node.
   template <typename BitField>
   Node* DecodeWord32FromWord(Node* word) {
-    return TruncateWordToWord32(DecodeWord<BitField>(word));
+    return DecodeWord32<BitField>(TruncateWordToWord32(word));
   }
 
   // Decodes an unsigned (!) value from |word32| to an uint32 node.
   TNode<Uint32T> DecodeWord32(SloppyTNode<Word32T> word32, uint32_t shift,
-                              uint32_t mask);
+                              uint32_t mask, uint32_t size);
 
   // Decodes an unsigned (!) value from |word| to a word-size node.
   Node* DecodeWord(Node* word, uint32_t shift, uint32_t mask);

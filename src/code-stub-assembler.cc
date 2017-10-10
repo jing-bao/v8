@@ -5294,13 +5294,13 @@ TNode<Object> CodeStubAssembler::ToInteger(SloppyTNode<Context> context,
 }
 
 TNode<Uint32T> CodeStubAssembler::DecodeWord32(SloppyTNode<Word32T> word32,
-                                               uint32_t shift, uint32_t mask) {
-  return UncheckedCast<Uint32T>(Word32Shr(
-      Word32And(word32, Int32Constant(mask)), static_cast<int>(shift)));
-}
-
-Node* CodeStubAssembler::DecodeWord(Node* word, uint32_t shift, uint32_t mask) {
-  return WordShr(WordAnd(word, IntPtrConstant(mask)), static_cast<int>(shift));
+                                               uint32_t shift, uint32_t mask,
+                                               uint32_t size) {
+  if (shift == 0)
+    return UncheckedCast<Uint32T>(Word32And(word32, Int32Constant(mask)));
+  return UncheckedCast<Uint32T>(
+      Word32Shr(Word32Shl(word32, Int32Constant(32 - size - shift)),
+                static_cast<int>(32 - size)));
 }
 
 Node* CodeStubAssembler::UpdateWord(Node* word, Node* value, uint32_t shift,
